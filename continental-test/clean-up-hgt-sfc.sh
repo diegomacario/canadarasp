@@ -13,6 +13,10 @@ if [ $MODEL == gdps ]; then # GDPS
  GOODTIMES=($(seq -w $TIMEONE $TIMESTEP $TIMESTOP))
  for H in ${GOODTIMES[*]}
  do
+  # This generates a symbolic link between the HGT_SFC file at the start time of the forecast and the HGT_SFC file at the forecast time $H.
+  # By creating symbolic links between the HGT_SFC files at the start and end times of the forecast,
+  # the script is able to ensure that the files exist for all forecast times,
+  # even if they were not downloaded directly from the server.
   ln $DOWNLOADDIRECTORY/$HGT_SFC_ZERO $DOWNLOADDIRECTORY/$( filename HGT_SFC_0 $H )
  done
 elif [ $MODEL == hrdps_rot ]; then

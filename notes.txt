@@ -1,0 +1,76 @@
+- The HRDPS model runs four times per day at 00Z, 06Z, 12Z, 18Z
+- We focus on serving west coast pilots who want a morning forecast before they head out and an evening forecast before bedtime
+- This is well served by the 06Z and 18Z runs
+- Each run takes 7 to 9 hours to complete, so the data for the 06Z run is available at 12:30Z (4:30 AM PT) and the data for the 18Z run is available at 01:15Z (5:15 PM PT)
+- This page that describes the model is outdated: https://www.weather.gc.ca/grib/grib2_HRDPS_HR_e.html
+- This page is up to date: https://eccc-msc.github.io/open-data/msc-data/nwp_hrdps/readme_hrdps-datamart_en/
+- ECCC went from using polar-stereographic grids to using rotated lan-lon grids.
+
+- canadarasp/crontab calls canadarasp/aws-utils/download-data-and-start-server.sh 3 times a day
+	- 01:15Z for HRDPS -> Process data from the 18Z run from the previous day
+	- 08:15Z for GDPS
+	- 12:30Z for HRDPS -> Process data from the 06Z run
+	- The Z means UTC
+	- These times are chosen so that the ECCC models are finished by then
+	- We download 48 hours for the HRDPS (it outputs data every hour) and 99 hours for the GDPS
+
+download-data-and-start-server.sh hrdps
+
+- canadarasp/aws-utils/download-data-and-start-server.sh calls canadarasp/continental-test/guess-time.sh
+
+./guess-time.sh $MODEL
+
+- That script calculates HOUR, DAY, MONTH and YEAR values to know which HRDPS run to download
+
+- canadarasp/aws-utils/download-data-and-start-server.sh then calls canadarasp/continental-test/download-data.sh
+
+- That scripts calls guess-time.sh and then it calls canadarasp/continental-test/model-parameters.sh
+
+model-parameters.sh hrdps
+
+- This is where things get weird. The HRDPS DIRECTORY parameter doesn't exist. In other words, this URL doesn't exist: https://dd.weather.gc.ca/model_hrdps/continental/grib2/
+- Only the HRDPS ROT directory exists: https://dd.weather.gc.ca/model_hrdps/continental/2.5km/
+- But since $MODEL is equal to "hrpds" starting at the crontab, we are in theory trying to access the URL that doesn't exist.
+- This doesn't make sense to me. Maybe Andrew hasn't pushed his changes to the crontab? I'm not sure.
+- Let's assume that $MODEL is equal to "hrdps_rot" for now.
+- These are the variables that get set in model-parameters.sh:
+
+export MODEL=$MODEL
+export FILETOPROBE="PRES_SFC_0" # how to tell if data is good at last hour
+
+export WEBSERVER="dd.weather.gc.ca"
+export DIRECTORY="model_hrdps/continental/2.5km"
+export FILEHEADER="$YEAR$MONTH$DAY"T"$HOUR""Z_MSC_HRDPS"
+export TIMESTART="1" # no prate data for zero
+export TIMESTEP="1"
+export TIMESTOP="48"
+export RESOLUTION=""
+export TAIL=".grib2"
+export FILE="HRDPS-ROT-files.txt"
+export OUTPUTDIR="/mnt/input/hrdps"
+export TILEDIR="/mnt/windgram-tiles/hrdps"
+export PNGDIR="/mnt/map-pngs/hrdps"
+export XMIN=-152
+export XMAX=-42
+export XSTEP=2
+export YMIN=26
+export YSTEP=2
+export YMAX=70
+export FILETOPROBE="PRES_Sfc" # how to tell if data is good at last hour
+
+filename () {
+ FILELABEL=$1;
+ H=$2;
+ echo $FILEHEADER"_$FILELABEL"$RESOLUTION$YEAR$MONTH$DAY$HOUR"_PT0"$H"H"$TAIL
+}
+downloadfilename () {
+ FILELABEL=$1;
+ H=$2;
+ echo $FILEHEADER"_$FILELABEL""_RLatLon0.0225_PT0"$H"H"$TAIL
+}
+
+export XVALS=($(seq $XMIN $XSTEP $XMAX))
+export YVALS=($(seq $YMIN $YSTEP $YMAX))
+
+export TIMES=($(seq -w $TIMESTART $TIMESTEP $TIMESTOP))
+export LEVELS=(550 600 650 700 750 800 850 875 900 925 950 970 985 1000 1015)
