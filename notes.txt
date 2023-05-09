@@ -74,3 +74,41 @@ export YVALS=($(seq $YMIN $YSTEP $YMAX))
 
 export TIMES=($(seq -w $TIMESTART $TIMESTEP $TIMESTOP))
 export LEVELS=(550 600 650 700 750 800 850 875 900 925 950 970 985 1000 1015)
+
+- download-data.sh then downloads all the files listed in /tmp/wget.jobs
+- Finally, it calls canadarasp/continental-test/clean-up-hgt-sfc.sh and canadarasp/continental-test/rename-hrdps-rot.sh
+- Those scripts create symbolic links for missing files and rename HRDPS ROT files to HRDPS files so that the data processing works properly
+
+- The compute server is then started
+- The compute server when started starts up continental-test/do-rasp-run-continental.sh through /etc/rc.local
+- canadarasp/config-files/compute-rc.local has this call in it:
+
+su ubuntu -c '(cd /home/ubuntu/continental-test ; mv rasp-run.log rasp-run.log.old ; ./do-rasp-run-continental.sh >& rasp-run.log &)'
+
+canadarasp/continental-test/do-rasp-run-continental.sh
+
+- This script initializes the internal SSD and creates a local swap file (needed for stability later, though we don't actually swap in steady state).
+- This script attaches and mounts the download box, copies the data to the local SSD, detaches and deletes the download box.
+- Then it calls continental-test/do-hrdps-plots-continental.sh
+
+do-hrdps-plots-continental.sh $YEAR $MONTH $DAY $HOUR
+
+- Generate windgrams, map tiles, and dynamic windgram data tiles and upload them all to the web-server
+- YEAR MONTH DAY HOUR are the forecast initialization time. These are just handled by guess-time.sh MODEL. This works fine, though the design is relatively fragile. We could frob this from the filenames on the download box. But this works OK for now.
+
+There are six main steps here:
+
+1) do-generate-new-variables.sh which computes some new parameters (HCRIT, WSTAR) across the whole domain and are used in the map soaring forecasts. These are re-computed in the windgram scripts because I was too lazy to fix them.
+
+2) clip-wind-to-terrain.sh which clips the wind fields to terrain (this seems to be broken --- this has to do with which file has the terrain information). This makes a nicer looking map, but isn't truly necessary.
+
+3) do-tile-generation.sh which generates the grib2 files used by the windgram generation scripts (both static and dynamic generation).
+
+4) do-windgrams-continental.sh which generates the static windgrams for all the sites in locations.txt and uploads them back to the web server (along with a locations / regions list to be read by the javascript front end). It also uploads the grib2 tile files generated in step 3 back to the web server for the dynamic windgram generation.
+
+5) generate-single-hrdps-plot-continental.lisp which generates the PNG and pseudo-PNG files for the google maps interface.
+
+6) upload-map-pngs.sh uploads the PNG files back to the web server.
+
+- Generally for each of these we grab the model-parameters which are encoded in model-parameters.sh and model-parameters.lisp to tell us something about the files we are processing.
+

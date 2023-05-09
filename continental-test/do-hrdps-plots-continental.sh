@@ -15,6 +15,12 @@
 
 echo "$0 $@"
 echo "Starting HRDPS plots at `date`"
+
+# The GRIB2TABLE variable specifies the location of the GRIB2 tables that are used to decode the HRDPS data.
+# The WGRIB2 variable specifies the location of the wgrib2 utility that is used to extract data from the GRIB2 files.
+# The PARALLELSUB, PARALLELTILE, and PARALLELNCL variables specify the number of parallel processes
+# that are used for various parts of the script.
+# The Z variable is set to the UTC offset.
 export GRIB2TABLE=/home/ubuntu/continental-test/grib2tables
 WGRIB2=wgrib2
 PARALLELSUB=15 # for fixing of file names which doesn't use any internal parallelization of wgrib2
@@ -25,6 +31,16 @@ YEAR=${1:-$YEAR}
 MONTH=${2:-$MONTH}
 DAY=${3:-$DAY}
 HOUR=${4:-$HOUR}  # 06 or 18
+# date: This command prints the current date and time.
+# +%-:::z: This option specifies the format of the output.
+# The %z format specifier is used to print the time zone offset in the format +HHMM or -HHMM.
+# The - before the % sign removes leading zeros.
+# The + sign is used to indicate that the time zone offset should be printed with a + sign if it is positive.
+# If the time zone offset is negative, the - sign is automatically included in the output.
+# The ::: characters are used to specify that the output should include colons between the hours and minutes,
+# even if the offset is zero.
+# The final z character is used to specify that the output should be the time zone offset in hours and minutes.
+Z=: This sets the Z variable to the output of the date command.
 Z=`date +%-:::z` # This is UTC offset
 source ./model-parameters.sh $MODEL
 echo "do-hrdps-plots.sh $YEAR-$MONTH-$DAY $HOUR for ${#TIMES[@]} hours, local UTC offset is $Z"
@@ -46,12 +62,14 @@ if [ -z $NOTILES ]; then
     ./do-tile-generation.sh $YEAR $MONTH $DAY $HOUR # takes 27 minutes with new wgrib2
     echo "Done generating tiles at `date`"
 fi
+
 if [ -z $NOWINDGRAMS ]; then
     echo "Generating windgrams at `date`"
     ./do-windgrams-continental.sh $YEAR $MONTH $DAY $HOUR # 3 minutes
     echo "Done generating windgrams `date`"
 fi
-if [ -z $NOMAP ]; then     # if string is NULL
+
+if [ -z $NOMAP ]; then # if string is NULL
     echo "Starting tile graphic generation at `date`"
     FORECASTHOURS=($(seq -w $TIMESTART $TIMESTEP $TIMESTOP))
     echo "Generating headers and footers for all hours starting at `date`"
